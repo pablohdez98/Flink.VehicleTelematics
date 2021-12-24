@@ -43,6 +43,7 @@ public class VehicleTelematics {
 
         speedRadar(events);
         averageSpeedControl(events);
+        accidentReporter(events);
 
         // Execution
         try {
@@ -108,5 +109,42 @@ public class VehicleTelematics {
                 }
             })
             .writeAsCsv(outFolderPath + "avespeedfines.csv", FileSystem.WriteMode.OVERWRITE).setParallelism(1);
+    }
+
+    /**
+     * Detects stopped vehicles on any segment. A vehicle is stopped when it reports
+     * at least 4 consecutive events from the same position.
+     * @param events input data
+     */
+    private static void accidentReporter(SingleOutputStreamOperator<Event> events) {
+        events
+            .filter((FilterFunction<Event>) in -> (in.event.f2 == 0))
+            .keyBy(new KeySelector<Event, Tuple1<Integer>>() {
+                @Override
+                public Tuple1<Integer> getKey(Event in) {
+                    return new Tuple1<>(in.event.f1);
+                }
+            })
+            .countWindow(4, 1)
+            .apply(new WindowFunction<Event, Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>,
+                    Tuple1<Integer>, GlobalWindow>() {
+                @Override
+                public void apply(Tuple1<Integer> key, GlobalWindow window, Iterable<Event> input,
+                                  Collector<Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>> collector) {
+                    Iterator<Event> iterator = input.iterator();
+                    Event first = iterator.next();
+                    Event last = first;
+                    int count = 1;
+                    while(iterator.hasNext()) {
+                        last = iterator.next();
+                        count++;
+                    }
+                    if (count == 4 && Objects.equals(first.event.f7, last.event.f7)) {
+                        collector.collect(new Tuple7<>(first.event.f0, last.event.f0, first.event.f1,
+                                first.event.f3, first.event.f6, first.event.f5, first.event.f7));
+                    }
+                }
+            })
+            .writeAsCsv(outFolderPath + "accidents.csv", FileSystem.WriteMode.OVERWRITE).setParallelism(1);
     }
 }
