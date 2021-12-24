@@ -40,11 +40,29 @@ public class VehicleTelematics {
                 .map((MapFunction<String, Event>) Event::new)
                 .assignTimestampsAndWatermarks(WatermarkStrategy.<Event>forMonotonousTimestamps()
                         .withTimestampAssigner((element, timeStamp) -> element.event.f0 * 1000));
+
+        speedRadar(events);
         // Execution
         try {
             env.execute("VehicleTelematics");
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Detects cars that overcome the speed limit of 90 mph
+     * @param events input data
+     */
+    private static void speedRadar(SingleOutputStreamOperator<Event> events) {
+        events
+                .filter((FilterFunction<Event>) in -> in.event.f2 > 90)
+                .map(new MapFunction<Event, Tuple6<Integer, Integer, Integer, Integer, Integer, Integer>>() {
+                    @Override
+                    public Tuple6<Integer, Integer, Integer, Integer, Integer, Integer> map(Event in) {
+                        return new Tuple6<>(in.event.f0, in.event.f1, in.event.f3, in.event.f6, in.event.f5, in.event.f2);
+                    }
+                })
+                .writeAsCsv(outFolderPath + "/speedfines.csv", FileSystem.WriteMode.OVERWRITE).setParallelism(1);
     }
 }
