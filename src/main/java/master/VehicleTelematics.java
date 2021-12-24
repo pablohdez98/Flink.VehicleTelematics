@@ -42,6 +42,8 @@ public class VehicleTelematics {
                         .withTimestampAssigner((element, timeStamp) -> element.event.f0 * 1000));
 
         speedRadar(events);
+        averageSpeedControl(events);
+
         // Execution
         try {
             env.execute("VehicleTelematics");
@@ -64,5 +66,47 @@ public class VehicleTelematics {
                     }
                 })
                 .writeAsCsv(outFolderPath + "/speedfines.csv", FileSystem.WriteMode.OVERWRITE).setParallelism(1);
+    }
+
+    /**
+     * Detects cars with an average speed higher than 60 mph between
+     * segments 52 and 56 (both included) in both directions. If a car sends several reports on segments
+     * 52 or 56, the ones taken for the average speed are the ones that cover a longer distance
+     * @param events input data
+     */
+    private static void averageSpeedControl(SingleOutputStreamOperator<Event> events) {
+        events
+            .filter((FilterFunction<Event>) in -> (in.event.f6 >= 52 && in.event.f6 <=56))
+            .keyBy(new KeySelector<Event, Tuple3<Integer, Integer, Integer>>() {
+                @Override
+                public Tuple3<Integer, Integer, Integer> getKey(Event in) {
+                    return new Tuple3<>(in.event.f1, in.event.f3, in.event.f5);
+                }
+            })
+            .window(EventTimeSessionWindows.withGap(Time.seconds(31)))
+            .apply(new WindowFunction<Event, Tuple6<Integer, Integer, Integer, Integer, Integer, Double>,
+                    Tuple3<Integer, Integer, Integer>, TimeWindow>() {
+                @Override
+                public void apply(Tuple3<Integer, Integer, Integer> key, TimeWindow window, Iterable<Event> input,
+                                  Collector<Tuple6<Integer, Integer, Integer, Integer, Integer, Double>> collector) {
+                    Iterator<Event> iterator = input.iterator();
+                    Event first = iterator.next();
+                    Event last = first;
+                    while(iterator.hasNext()) {
+                        last = iterator.next();
+                    }
+                    if ((first.event.f6 == 52 && last.event.f6 == 56) || (first.event.f6 == 56 && last.event.f6 == 52)) {
+                        float distance = Math.abs(last.event.f7 - first.event.f7);
+                        float time = Math.abs(last.event.f0 - first.event.f0);
+                        double avgSpeed = (distance / time) * 2.23694;
+
+                        if (avgSpeed > 60) {
+                            collector.collect(new Tuple6<>(first.event.f0, last.event.f0, first.event.f1, first.event.f3,
+                                    first.event.f5, avgSpeed));
+                        }
+                    }
+                }
+            })
+            .writeAsCsv(outFolderPath + "avespeedfines.csv", FileSystem.WriteMode.OVERWRITE).setParallelism(1);
     }
 }
