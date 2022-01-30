@@ -30,7 +30,7 @@ The application has been developed using the versions of the software: Oracle Ja
 
 ### How to Run the Project
 
-The cdv file used can be found it at https://dl.lsdupm.ovh/CLOUD/2122/sample-traffic-3xways.csv
+The csv file used can be found it at https://dl.lsdupm.ovh/CLOUD/2122/sample-traffic-3xways.csv
 
 To run the project, first we create the jar file:
 ```
