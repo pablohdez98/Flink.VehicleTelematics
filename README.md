@@ -26,7 +26,7 @@ segments 52 and 56 (both included) in both directions. If a car sends several re
 
 ### Requirements
 
-The application has beeb developed using the versions of the software: Oracle Java 11, Maven, Flink 1.14.0. The project was configured with the flink-quickstart-java maven artifact
+The application has been developed using the versions of the software: Oracle Java 11, Maven, Flink 1.14.0. The project was configured with the flink-quickstart-java maven artifact
 
 ### How to Run the Project
 
